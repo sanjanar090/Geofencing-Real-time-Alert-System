@@ -1,6 +1,6 @@
 module github.com/dewanshpatle/geofencing-real-time-alert-system
 
-go 1.27.3
+go 1.25.0
 
 require (
 	github.com/gorilla/mux v1.8.1 // indirect
