@@ -29,5 +29,10 @@ pool.Close()
 return nil, fmt.Errorf("database ping failed: %w", err)
 }
 
+// Auto-initialize PostGIS extension and database schema
+if schemaBytes, err := os.ReadFile("backend/database/schema.sql"); err == nil {
+	_, _ = pool.Exec(context.Background(), string(schemaBytes))
+}
+
 return pool, nil
 }
