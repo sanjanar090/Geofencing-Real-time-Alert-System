@@ -588,3 +588,188 @@ These are not required but will be considered favorably:
 If you have any questions about the assessment, please reach out to the hiring team at MapUp.
 
 **Good luck! We're excited to see what you build! 🚀**
+
+
+---
+
+# 🚀 Implementation & Submission Documentation
+
+## 🏗️ System Architecture
+
+```mermaid
+flowchart TD
+    subgraph Client ["Frontend Layer (React 19 + Vite)"]
+        UI["GeoTrack Dashboard UI"]
+        Map["Leaflet / React Leaflet Map"]
+        WSClient["WebSocket Client (/ws/alerts)"]
+    end
+
+    subgraph Server ["Backend Layer (Go 1.23)"]
+        Router["Gorilla Mux HTTP Router"]
+        Hub["WebSocket Alert Hub"]
+        GeoHandler["Geofence Handlers"]
+        VehHandler["Vehicle Handlers"]
+        LocHandler["Location & Spatial Breach Engine"]
+        AlertHandler["Alert & Rules Engine"]
+    end
+
+    subgraph Storage ["Database Layer (PostgreSQL + PostGIS)"]
+        PG[("PostgreSQL 16")]
+        GIS["PostGIS Spatial Extension"]
+        Tables["geofences, vehicles, vehicle_locations, alert_configs, alerts"]
+    end
+
+    UI -->|REST API /api| Router
+    Map -->|Geometries & Positions| Router
+    WSClient <-->|Real-Time Alert Feed| Hub
+    LocHandler -->|Broadcasts Breaches| Hub
+    Router --> GeoHandler & VehHandler & LocHandler & AlertHandler
+    GeoHandler & VehHandler & LocHandler & AlertHandler -->|pgxpool / SQL| Tables
+    LocHandler -->|ST_Covers, ST_SetSRID| GIS
+```
+
+---
+
+## ⚡ Quick Start Guide
+
+### Option 1: Docker Compose (All Services in One Command)
+
+Prerequisites: Docker & Docker Compose installed.
+
+```bash
+# Clone and enter the repository
+cd mapup-project
+
+# Start PostGIS, Go Backend, and React Frontend
+docker-compose up --build
+```
+
+- **Frontend Application**: `http://localhost:5173`
+- **Backend API**: `http://localhost:8080`
+- **PostGIS Database**: `localhost:5432` (`geofencing_db` / `postgres` / `geofencing_dev_2026`)
+
+---
+
+### Option 2: Local Development Setup
+
+#### 1. Start PostGIS Database
+```bash
+docker run --name geofencing-db -e POSTGRES_PASSWORD=geofencing_dev_2026 -e POSTGRES_DB=geofencing_db -p 5432:5432 -d postgis/postgis:16-3.5
+```
+Apply the schema:
+```bash
+psql -h localhost -U postgres -d geofencing_db -f backend/database/schema.sql
+```
+
+#### 2. Run Go Backend
+```bash
+cd mapup-project
+$env:DATABASE_URL="postgres://postgres:geofencing_dev_2026@localhost:5432/geofencing_db?sslmode=disable"
+go run .
+```
+Backend will start on `http://localhost:8080`.
+
+#### 3. Run React Frontend
+```bash
+cd frontend
+npm install
+npm run dev
+```
+Open `http://localhost:5173` in your browser.
+
+---
+
+## 📡 API Reference & Verification Examples
+
+All responses include `"time_ns"` (execution time in nanoseconds) as required.
+
+### 1. Create Geofence
+`POST /geofences`
+```bash
+curl -X POST http://localhost:8080/geofences \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Hyderabad Delivery Zone",
+    "description": "Central delivery zone",
+    "category": "delivery_zone",
+    "coordinates": [
+      [17.385, 78.4867],
+      [17.390, 78.4867],
+      [17.390, 78.4920],
+      [17.385, 78.4920],
+      [17.385, 78.4867]
+    ]
+  }'
+```
+
+### 2. List Geofences
+`GET /geofences`
+```bash
+curl -X GET http://localhost:8080/geofences
+```
+
+### 3. Register Vehicle
+`POST /vehicles`
+```bash
+curl -X POST http://localhost:8080/vehicles \
+  -H "Content-Type: application/json" \
+  -d '{
+    "vehicle_number": "TS09AB9999",
+    "driver_name": "Vikram Singh",
+    "vehicle_type": "Truck",
+    "phone": "9876543210"
+  }'
+```
+
+### 4. List Vehicles
+`GET /vehicles`
+```bash
+curl -X GET http://localhost:8080/vehicles
+```
+
+### 5. Update GPS Location (Triggers Breach & WebSocket Broadcast)
+`POST /vehicles/location`
+```bash
+curl -X POST http://localhost:8080/vehicles/location \
+  -H "Content-Type: application/json" \
+  -d '{
+    "vehicle_id": 1,
+    "latitude": 17.388,
+    "longitude": 78.489,
+    "timestamp": "2026-11-13T08:00:00Z"
+  }'
+```
+
+### 6. Get Vehicle Location
+`GET /vehicles/location/{vehicle_id}`
+```bash
+curl -X GET http://localhost:8080/vehicles/location/1
+```
+
+### 7. Configure Alert Rule
+`POST /alerts/configure`
+```bash
+curl -X POST http://localhost:8080/alerts/configure \
+  -H "Content-Type: application/json" \
+  -d '{
+    "geofence_id": 1,
+    "vehicle_id": null,
+    "event_type": "both"
+  }'
+```
+
+### 8. List Alerts
+`GET /alerts?geofence_id=1`
+```bash
+curl -X GET "http://localhost:8080/alerts"
+```
+
+### 9. Violation History
+`GET /violations/history?limit=50`
+```bash
+curl -X GET "http://localhost:8080/violations/history"
+```
+
+### 10. Live WebSocket Stream
+`ws://localhost:8080/ws/alerts`
+Streams JSON alerts to all connected clients whenever an entry or exit breach occurs.

@@ -1,0 +1,48 @@
+services:
+  db:
+    image: postgis/postgis:16-3.5
+    container_name: geofencing-db
+    environment:
+      POSTGRES_DB: geofencing_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: geofencing_dev_2026
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./backend/database/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d geofencing_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: geofencing-backend
+    environment:
+      DATABASE_URL: "postgres://postgres:geofencing_dev_2026@db:5432/geofencing_db?sslmode=disable"
+      PORT: "8080"
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: geofencing-frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  pgdata:
