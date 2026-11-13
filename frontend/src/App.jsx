@@ -192,8 +192,17 @@ function App() {
 
     function connectWebSocket() {
       try {
-        const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-        const wsUrl = `${protocol}//${window.location.hostname}:8080/ws/alerts`;
+        let wsUrl;
+        if (import.meta.env.VITE_WS_URL) {
+          wsUrl = `${import.meta.env.VITE_WS_URL.replace(/\/+$/, "")}/ws/alerts`;
+        } else if (import.meta.env.VITE_API_URL) {
+          const apiUrl = new URL(import.meta.env.VITE_API_URL);
+          const wsProto = apiUrl.protocol === "https:" ? "wss:" : "ws:";
+          wsUrl = `${wsProto}//${apiUrl.host}/ws/alerts`;
+        } else {
+          const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+          wsUrl = `${protocol}//${window.location.hostname}:8080/ws/alerts`;
+        }
 
         const ws = new WebSocket(wsUrl);
         wsRef.current = ws;

@@ -13,6 +13,20 @@ import (
 	"github.com/dewanshpatle/geofencing-real-time-alert-system/backend/services"
 )
 
+// CORS middleware to allow cross-origin requests from deployed frontend
+func corsMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 func main() {
 	// Connect to PostgreSQL
 	pool, err := database.Connect()
@@ -64,5 +78,5 @@ func main() {
 	}
 
 	log.Println("Server running on http://localhost:" + port)
-	log.Fatal(http.ListenAndServe(":"+port, router))
+	log.Fatal(http.ListenAndServe(":"+port, corsMiddleware(router)))
 }
